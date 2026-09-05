@@ -1,0 +1,57 @@
+
+name: 机场自动签到
+
+on:
+  workflow_dispatch:
+ # push:
+ #   branches:
+ #     - main
+  schedule:
+    - cron: "0 4,9,20 * * *"
+    
+env:
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+    - name: Add the custom timezone database file
+      run: |
+        sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+        
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.20'
+      
+    - name: Run
+      env:
+          JICHANG: ${{ secrets.JICHANG }}
+          RSAPUBLIC: ${{ secrets.RSA_PUBLIC }}
+          RSAPRIVATE: ${{ secrets.RSA_PRIVATE }}
+          TZURL: ${{ secrets.NOTICE_URL }}
+          TZKEY: ${{ secrets.NOTICE_KEY }}
+      run: go run main.go
+
+    - name: Commit and push
+      run: |
+        git config --local user.email "test+github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        # git config --local user.name "${{ github.actor }}"
+        git remote set-url origin https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+        # git pull --rebase
+        git checkout --orphan latest_branch
+        git rm -rf --cached .
+        git add -A
+        git commit -m "$(date +'%Y-%m-%d %H:%M:%S') OK"
+        git branch -D ${{ github.ref_name }}
+        git branch -m ${{ github.ref_name }}
+        git push -f origin ${{ github.ref_name }}
